@@ -23,17 +23,32 @@ def fit_model_caller():
 def index():
     if request.method == "POST":
         file = request.files.get("image")
+        label = request.form.get("label")  # Doggg / Other
 
-        if file and file.filename != "":
-            file_path = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
-            
-            file.save(file_path)
-            # print( class_img(file_path))
-            return f"Image uploaded successfully: {file.filename}, {class_img(file_path)}"
+        if not file or file.filename == "":
+            return "No file selected"
 
-        return "No file selected"
+        if label not in ["Doggg", "Other"]:
+            return "Invalid label"
+
+        # dataset/Doggg or dataset/Other
+        target_dir = os.path.join("dataset", label)
+        os.makedirs(target_dir, exist_ok=True)
+
+        file_path = os.path.join(target_dir, file.filename)
+        file.save(file_path)
+
+        prediction = class_img(file_path)
+
+        return {
+            "file": file.filename,
+            "saved_to": target_dir,
+            # "prediction": prediction
+        }
 
     return render_template("index.html")
+
+
 
 
 def class_img(img_path):
