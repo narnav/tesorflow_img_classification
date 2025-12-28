@@ -3,6 +3,8 @@ from PIL import Image, ImageOps  # Install pillow instead of PIL
 import numpy as np
 from flask import Flask, render_template, request
 import os
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+import tensorflow as tf
 
 app = Flask(__name__)
 
@@ -11,6 +13,11 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 # create uploads folder if not exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+@app.route("/fit", methods=["GET"])
+def fit_model_caller():
+    fit_model()
+    return {"model":"fited"}
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -68,9 +75,64 @@ def class_img(img_path):
     confidence_score = prediction[0][index]
     return ({"Class":class_name[2:],"Confidence Score":confidence_score})
 
+
 # check  class_img - QA
 # class_img("./test/plane.jpg")
 # class_img("./test/lion.jpg")
+
+
+def fit_model():
+    IMAGE_SIZE = (224, 224)
+    BATCH_SIZE = 8
+    EPOCHS = 5
+    DATASET_DIR = "dataset"
+
+    # Load existing model
+    model = load_model("keras_Model.h5", compile=False, safe_mode=False)
+
+    # Compile (required before fit)
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
+        loss="categorical_crossentropy",
+        metrics=["accuracy"]
+    )
+
+    # Image generator
+    datagen = ImageDataGenerator(
+        rescale=1.0 / 127.5,
+        validation_split=0.2
+    )
+
+    train_gen = datagen.flow_from_directory(
+        DATASET_DIR,
+        target_size=IMAGE_SIZE,
+        batch_size=BATCH_SIZE,
+        class_mode="categorical",
+        subset="training"
+    )
+
+    val_gen = datagen.flow_from_directory(
+        DATASET_DIR,
+        target_size=IMAGE_SIZE,
+        batch_size=BATCH_SIZE,
+        class_mode="categorical",
+        subset="validation"
+    )
+
+    # Train
+    model.fit(
+        train_gen,
+        validation_data=val_gen,
+        epochs=EPOCHS
+    )
+
+    # Save updated model
+    model.save("keras_Model.h5")
+
+    print("✅ Model updated successfully")
+
+
+
 
 if __name__ == "__main__":
     app.run(debug=True)
